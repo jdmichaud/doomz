@@ -18,7 +18,7 @@ pub fn main() !u8 {
 
     // start doom
     std.debug.print("Starting D_DoomMain\n", .{});
-    
+
     dg_Create();
 
     D_DoomMain ();
