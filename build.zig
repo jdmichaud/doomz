@@ -10,7 +10,7 @@ pub fn setup_wasm(b: *std.build, optimize: std.builtin.Mode, cflags: []const []c
     });
     lib.addIncludePath("./doomgeneric/doomgeneric");
     addSourceFiles(lib, cflags);
-    lib.linkLibC(); // better than linkSystemLibrary("c") for cross-compilation
+    // lib.linkLibC(); // better than linkSystemLibrary("c") for cross-compilation
     // lib.linkSystemLibrary("c");
     lib.import_memory = true;
     lib.stack_size = 32 * 1024 * 1024;
@@ -19,6 +19,9 @@ pub fn setup_wasm(b: *std.build, optimize: std.builtin.Mode, cflags: []const []c
     // lib.max_memory = 65536;
     // lib.stack_size = 14752;
     // lib.export_symbol_names = &[_][]const u8{ "add" };
+    lib.rdynamic = true;
+    // So we don't need to define like __stack_chk_guard and __stack_chk_fail
+    lib.stack_protector = false;
 
     const wasm_step = b.step("wasm", "Compile the wasm library");
     wasm_step.dependOn(&b.addInstallArtifact(lib).step);
