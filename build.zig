@@ -1,17 +1,22 @@
 const std = @import("std");
 
-pub fn setup_wasm(b: *std.build, optimize: std.builtin.Mode, cflags: []const []const u8) void {
-    const lib = b.addSharedLibrary(.{
-        .name = "doomz",
-        .version = .{ .major = 1, .minor = 0 },
-        .optimize = optimize,
-        .target = .{ .cpu_arch = .wasm32, .os_tag = .freestanding },
-        .root_source_file = .{ .path = "src/doomgeneric_wasm.zig" },
+pub fn setup_wasm(b: *std.Build, optimize: std.builtin.Mode, cflags: []const []const u8) void {
+    const lib = b.addExecutable(.{
+      .name = "doomz",
+      .version = .{ .major = 1, .minor = 0, .patch = 0 },
+      // .optimize = .ReleaseSmall, // We force ReleaseSmall for now because of too many locals
+      .optimize = optimize,
+      .target = b.resolveTargetQuery(.{
+        .cpu_arch = .wasm32,
+        .os_tag = .freestanding,
+      }),
+      .root_source_file = .{ .path = "src/doomgeneric_wasm.zig" },
     });
-    lib.addIncludePath("./doomgeneric/doomgeneric");
+    lib.addIncludePath(.{ .cwd_relative = "./doomgeneric/doomgeneric" });
     addSourceFiles(lib, cflags);
-    // lib.linkLibC(); // better than linkSystemLibrary("c") for cross-compilation
+    lib.linkLibC(); // better than linkSystemLibrary("c") for cross-compilation
     // lib.linkSystemLibrary("c");
+    lib.entry = .disabled;
     lib.import_memory = true;
     lib.stack_size = 32 * 1024 * 1024;
     // lib.use_stage1 = true; // stage2 not ready
@@ -19,12 +24,12 @@ pub fn setup_wasm(b: *std.build, optimize: std.builtin.Mode, cflags: []const []c
     // lib.max_memory = 65536;
     // lib.stack_size = 14752;
     // lib.export_symbol_names = &[_][]const u8{ "add" };
-    lib.rdynamic = true;
+    // lib.rdynamic = true;
     // So we don't need to define like __stack_chk_guard and __stack_chk_fail
-    lib.stack_protector = false;
+    // lib.stack_protector = false;
 
     const wasm_step = b.step("wasm", "Compile the wasm library");
-    wasm_step.dependOn(&b.addInstallArtifact(lib).step);
+    wasm_step.dependOn(&b.addInstallArtifact(lib, .{}).step);
 }
 
 // Although this function looks imperative, note that its job is to
@@ -50,9 +55,9 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    exe.addIncludePath("./doomgeneric/doomgeneric");
+    exe.addIncludePath(.{ .cwd_relative = "./doomgeneric/doomgeneric" });
     // This option doesn't seem to work for now...
-    exe.disable_sanitize_c = true;
+    // exe.disable_sanitize_c = true;
     // ... so we need to do this manually because doomgeneric is full of
     // undefined behavior and clang sanitizer emits illegal instruction when
     // encoutering those by zig defaults.
@@ -61,8 +66,13 @@ pub fn build(b: *std.Build) void {
         // Some implici declaration in doomgeneric...
         "-Wno-implicit-function-declaration",
     };
-    exe.addCSourceFiles(&.{"doomgeneric/doomgeneric/doomgeneric_sdl.c"}, &cflags);
-    exe.addCSourceFiles(&.{"doomgeneric/doomgeneric/m_misc.c"}, &cflags);
+    exe.addCSourceFiles(.{
+      .files = &.{
+        "doomgeneric/doomgeneric/doomgeneric_sdl.c",
+        "doomgeneric/doomgeneric/m_misc.c",
+      },
+      .flags = &cflags
+    });
     addSourceFiles(exe, &cflags);
     exe.linkSystemLibrary("SDL2");
     exe.linkLibC(); // better than linkSystemLibrary("c") for cross-compilation
@@ -114,7 +124,7 @@ pub fn build(b: *std.Build) void {
     setup_wasm(b, optimize, &cflags);
 }
 
-pub fn addSourceFiles(target: *std.build.LibExeObjStep, cflags: []const []const u8) void {
+pub fn addSourceFiles(target: *std.Build.Step.Compile, cflags: []const []const u8) void {
     const doomgeneric_sources = [_][]const u8{
         "doomgeneric/doomgeneric/p_doors.c",
         "doomgeneric/doomgeneric/w_file_stdc.c",
@@ -197,5 +207,5 @@ pub fn addSourceFiles(target: *std.build.LibExeObjStep, cflags: []const []const 
         "doomgeneric/doomgeneric/w_wad.c",
         "doomgeneric/doomgeneric/z_zone.c",
     };
-    target.addCSourceFiles(&doomgeneric_sources, cflags);
+    target.addCSourceFiles(.{ .files = &doomgeneric_sources, .flags = cflags });
 }

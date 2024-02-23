@@ -53,8 +53,8 @@ export fn printf(format: [*]const u8, _: [*]const u8) i16 {
   return 0;
 }
 
-export fn abs(v: i32) i32 {
-  return std.math.absInt(v) catch 0;
+export fn abs(v: i32) u32 {
+  return @abs(v);
 }
 
 export fn DG_Init() void {
